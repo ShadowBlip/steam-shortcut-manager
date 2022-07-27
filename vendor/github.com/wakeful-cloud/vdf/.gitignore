@@ -4,7 +4,6 @@
 *.dll
 *.so
 *.dylib
-bin
 
 # Test binary, built with `go test -c`
 *.test
@@ -14,3 +13,6 @@ bin
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# VDF Example
+example/out.vdf
