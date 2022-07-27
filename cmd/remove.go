@@ -7,21 +7,68 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
+	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
 	"github.com/spf13/cobra"
 )
 
 // removeCmd represents the remove command
 var removeCmd = &cobra.Command{
-	Use:   "remove",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "remove <name>",
+	Short: "Remove a Steam shortcut from your library",
+	Long:  `Remove a Steam shortcut from your library`,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("remove called")
+		name := args[0]
+
+		// Fetch all users
+		users, err := steam.GetUsers()
+		if err != nil {
+			panic(err)
+		}
+
+		// Check to see if we're fetching for just one user
+		onlyForUser := cmd.Flags().Lookup("user").Value.String()
+
+		// Fetch all shortcuts
+		for _, user := range users {
+			if !steam.HasShortcuts(user) {
+				continue
+			}
+			if onlyForUser != "all" && onlyForUser != user {
+				continue
+			}
+
+			shortcutsPath, _ := steam.GetShortcutsPath(user)
+			shortcuts, err := shortcut.Load(shortcutsPath)
+			if err != nil {
+				panic(err)
+			}
+
+			// Find the shortcut to remove by name
+			shortcutsList := []shortcut.Shortcut{}
+			for _, sc := range shortcuts.Shortcuts {
+				if sc.AppName == name {
+					continue
+				}
+				shortcutsList = append(shortcutsList, sc)
+			}
+
+			// Create a new shortcuts object that we will save
+			newShortcuts := &shortcut.Shortcuts{
+				Shortcuts: map[string]shortcut.Shortcut{},
+			}
+			for key, sc := range shortcutsList {
+				newShortcuts.Shortcuts[fmt.Sprintf("%v", key)] = sc
+			}
+
+			// Write the changes
+			err = shortcut.Save(newShortcuts, shortcutsPath)
+			if err != nil {
+				panic(err)
+			}
+		}
+
 	},
 }
 
@@ -29,6 +76,7 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 
 	// Here you will define your flags and configuration settings.
+	removeCmd.Flags().String("user", "all", "Steam user ID to remove the shortcut for")
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:

@@ -41,7 +41,19 @@ var listCmd = &cobra.Command{
 		// Print the output
 		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
 		switch format {
-		case "json", "term":
+		case "term":
+			for user, shortcuts := range results {
+				if shortcuts.Shortcuts == nil || len(shortcuts.Shortcuts) == 0 {
+					continue
+				}
+				fmt.Println("User:", user)
+				for _, sc := range shortcuts.Shortcuts {
+					fmt.Println("  ", sc.AppName)
+					fmt.Println("    Executable:    ", sc.Exe)
+					fmt.Println("    Launch Options:", sc.LaunchOptions)
+				}
+			}
+		case "json":
 			out, err := json.MarshalIndent(results, "", "  ")
 			if err != nil {
 				panic(err)
