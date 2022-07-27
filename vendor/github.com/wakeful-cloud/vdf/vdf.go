@@ -232,7 +232,7 @@ func addMap(vdfMap Map) ([]byte, error) {
 
 			buffer = append(buffer, bytes...)
 		default:
-			return nil, errors.New("unrecognized go type for " + k)
+			return nil, errors.New("unrecognized go type")
 		}
 	}
 

@@ -1,16 +1,15 @@
 package steamgriddb
 
-import "encoding/json"
-
+// Response is a generic SteamGridDB response
 type Response struct {
-	Success bool              `json:"success"`
-	Data    []json.RawMessage `json:"data"`
+	Success bool     `json:"success"`
+	Errors  []string `json:"errors"`
 }
 
 // 'https://www.steamgriddb.com/api/v2/search/autocomplete/{term}'
 type SearchResponse struct {
-	Success bool                 `json:"success"`
-	Data    []SearchResponseData `json:"data"`
+	Response
+	Data []SearchResponseData `json:"data"`
 }
 
 type SearchResponseData struct {
@@ -22,48 +21,52 @@ type SearchResponseData struct {
 
 // https://www.steamgriddb.com/api/v2/grids/game/{gameId}
 type GridResponse struct {
-	Success bool `json:"success"`
-	Data    []struct {
-		ID        int         `json:"id"`
-		Score     int         `json:"score"`
-		Style     string      `json:"style"`
-		Width     int         `json:"width"`
-		Height    int         `json:"height"`
-		Nsfw      bool        `json:"nsfw"`
-		Humor     bool        `json:"humor"`
-		Notes     interface{} `json:"notes"`
-		Mime      string      `json:"mime"`
-		Language  string      `json:"language"`
-		URL       string      `json:"url"`
-		Thumb     string      `json:"thumb"`
-		Lock      bool        `json:"lock"`
-		Epilepsy  bool        `json:"epilepsy"`
-		Upvotes   int         `json:"upvotes"`
-		Downvotes int         `json:"downvotes"`
-		Author    struct {
-			Name    string `json:"name"`
-			Steam64 string `json:"steam64"`
-			Avatar  string `json:"avatar"`
-		} `json:"author"`
-	} `json:"data"`
+	Response
+	Data []GridResponseData `json:"data"`
+}
+
+type GridResponseData struct {
+	ID        int         `json:"id"`
+	Score     int         `json:"score"`
+	Style     string      `json:"style"`
+	Width     int         `json:"width"`
+	Height    int         `json:"height"`
+	Nsfw      bool        `json:"nsfw"`
+	Humor     bool        `json:"humor"`
+	Notes     interface{} `json:"notes"`
+	Mime      string      `json:"mime"`
+	Language  string      `json:"language"`
+	URL       string      `json:"url"`
+	Thumb     string      `json:"thumb"`
+	Lock      bool        `json:"lock"`
+	Epilepsy  bool        `json:"epilepsy"`
+	Upvotes   int         `json:"upvotes"`
+	Downvotes int         `json:"downvotes"`
+	Author    struct {
+		Name    string `json:"name"`
+		Steam64 string `json:"steam64"`
+		Avatar  string `json:"avatar"`
+	} `json:"author"`
 }
 
 // https://www.steamgriddb.com/api/v2/heroes/game/{gameId}
 type HeroesResponse struct {
-	Success bool `json:"success"`
-	Data    []struct {
-		ID     int      `json:"id"`
-		Score  int      `json:"score"`
-		Style  string   `json:"style"`
-		URL    string   `json:"url"`
-		Thumb  string   `json:"thumb"`
-		Tags   []string `json:"tags"`
-		Author struct {
-			Name    string `json:"name"`
-			Steam64 string `json:"steam64"`
-			Avatar  string `json:"avatar"`
-		} `json:"author"`
-	} `json:"data"`
+	Response
+	Data []ImageResponseData `json:"data"`
+}
+
+type ImageResponseData struct {
+	ID     int      `json:"id"`
+	Score  int      `json:"score"`
+	Style  string   `json:"style"`
+	URL    string   `json:"url"`
+	Thumb  string   `json:"thumb"`
+	Tags   []string `json:"tags"`
+	Author struct {
+		Name    string `json:"name"`
+		Steam64 string `json:"steam64"`
+		Avatar  string `json:"avatar"`
+	} `json:"author"`
 }
 
 // https://www.steamgriddb.com/api/v2/logos/game/{gameId}

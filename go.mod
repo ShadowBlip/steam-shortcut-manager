@@ -3,7 +3,7 @@ module github.com/shadowblip/steam-shortcut-manager
 go 1.18
 
 require (
-	github.com/fatih/structs v1.1.0
+	github.com/dolmen-go/kittyimg v0.0.0-20220724200233-b126743af44c
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
 	github.com/wakeful-cloud/vdf v0.0.0-20210218214150-0be6ec18b390

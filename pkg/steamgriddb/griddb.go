@@ -2,7 +2,9 @@ package steamgriddb
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -35,13 +37,57 @@ func (c *Client) debug(str string) {
 
 // Get will perform a GET request to the given SteamGridDB API endpoint.
 func (c *Client) Get(path string) (*http.Response, error) {
-	c.debug("GET " + getUrl(path))
-	req, err := http.NewRequest("GET", getUrl(path), nil)
+	return c.get(getUrl(path))
+}
+
+func (c *Client) get(url string) (*http.Response, error) {
+	c.debug("GET " + url)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	return c.client.Do(req)
+	res, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("Received non 200 response code")
+	}
+	return res, nil
+}
+
+// Download will download the given file to the provided path
+func (c *Client) Download(url, path string) error {
+	// Fetch the file
+	res, err := c.get(url)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	// Create a empty file
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Write the bytes to the file
+	_, err = io.Copy(file, res.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CachedDownload will download only if the file does not already exist.
+func (c *Client) CachedDownload(url, path string) error {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return c.Download(url, path)
+	}
+	return nil
 }
 
 // Search will return a list of search results for the given term
