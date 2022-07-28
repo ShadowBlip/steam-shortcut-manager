@@ -7,7 +7,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 
 	"github.com/shadowblip/steam-shortcut-manager/pkg/image"
@@ -52,6 +51,8 @@ func (s *SearchOutput) Print(client *steamgriddb.Client) {
 			}
 		}
 		fmt.Println("  Grid Images")
+		fmt.Println("    ID:", data.ID)
+		fmt.Println("    Style:", data.Style)
 		fmt.Println("    Author:", data.Author.Name)
 		fmt.Println("    URL:", data.URL)
 		if image.CanDisplay {
@@ -67,6 +68,8 @@ func (s *SearchOutput) Print(client *steamgriddb.Client) {
 			}
 		}
 		fmt.Println("  Logo Images")
+		fmt.Println("    ID:", data.ID)
+		fmt.Println("    Style:", data.Style)
 		fmt.Println("    Author:", data.Author.Name)
 		fmt.Println("    URL:", data.URL)
 		if image.CanDisplay {
@@ -82,6 +85,8 @@ func (s *SearchOutput) Print(client *steamgriddb.Client) {
 			}
 		}
 		fmt.Println("  Icon Images")
+		fmt.Println("    ID:", data.ID)
+		fmt.Println("    Style:", data.Style)
 		fmt.Println("    Author:", data.Author.Name)
 		fmt.Println("    URL:", data.URL)
 		if image.CanDisplay {
@@ -97,6 +102,8 @@ func (s *SearchOutput) Print(client *steamgriddb.Client) {
 			}
 		}
 		fmt.Println("  Hero Images")
+		fmt.Println("    ID:", data.ID)
+		fmt.Println("    Style:", data.Style)
 		fmt.Println("    Author:", data.Author.Name)
 		fmt.Println("    URL:", data.URL)
 		if image.CanDisplay {
@@ -107,12 +114,16 @@ func (s *SearchOutput) Print(client *steamgriddb.Client) {
 
 // search for SteamGridDB images
 func search(cmd *cobra.Command, args []string, kind SearchType) {
+	format := rootCmd.PersistentFlags().Lookup("output").Value.String()
+
+	// Ensure we have a SteamGridDB API Key
 	apiKey, _ := cmd.Flags().GetString("api-key")
 	if apiKey == "" {
 		cmd.Help()
-		fmt.Println("Error: API Key is required")
-		os.Exit(1)
+		ExitError(fmt.Errorf("API key is required"), format)
 	}
+
+	// Create a SteamGridDB Client
 	client := steamgriddb.NewClient(apiKey)
 	results, err := client.Search(args[0])
 	if err != nil {
@@ -125,7 +136,7 @@ func search(cmd *cobra.Command, args []string, kind SearchType) {
 	}
 
 	// Filter our results
-	maxResults := getFlagInt(cmd, "num-results")
+	maxResults := getFlagInt(cmd, "max-results")
 	if maxResults > len(results.Data) {
 		maxResults = len(results.Data)
 	}
@@ -144,11 +155,18 @@ func search(cmd *cobra.Command, args []string, kind SearchType) {
 			Logos:   []steamgriddb.ImageResponseData{},
 			Icons:   []steamgriddb.ImageResponseData{},
 		}
-		maxImages := getFlagInt(cmd, "num-images")
+		maxImages := getFlagInt(cmd, "max-images")
 
 		// Get all grid images
 		if kind.Has(SearchGrids) {
-			grids, err := client.GetGrids(appID)
+			// Add any requested filters
+			filters := []steamgriddb.FilterGrid{}
+			if style := cmd.Flags().Lookup("style-grid").Value.String(); style != "" {
+				filters = append(filters, steamgriddb.FilterGridStyle(style))
+			}
+
+			// Get the grids
+			grids, err := client.GetGrids(appID, filters...)
 			if err != nil {
 				panic(err)
 			}
@@ -162,7 +180,14 @@ func search(cmd *cobra.Command, args []string, kind SearchType) {
 
 		// Get all hero images
 		if kind.Has(SearchHeroes) {
-			heroes, err := client.GetHeroes(appID)
+			// Add any requested filters
+			filters := []steamgriddb.FilterHeroes{}
+			if style := cmd.Flags().Lookup("style-hero").Value.String(); style != "" {
+				filters = append(filters, steamgriddb.FilterHeroesStyle(style))
+			}
+
+			// Get the heroes
+			heroes, err := client.GetHeroes(appID, filters...)
 			if err != nil {
 				panic(err)
 			}
@@ -176,6 +201,13 @@ func search(cmd *cobra.Command, args []string, kind SearchType) {
 
 		// Get all logo images
 		if kind.Has(SearchLogos) {
+			// Add any requested filters
+			filters := []steamgriddb.FilterLogos{}
+			if style := cmd.Flags().Lookup("style-logo").Value.String(); style != "" {
+				filters = append(filters, steamgriddb.FilterLogosStyle(style))
+			}
+
+			// Get the logos
 			logos, err := client.GetLogos(appID)
 			if err != nil {
 				panic(err)
@@ -190,6 +222,13 @@ func search(cmd *cobra.Command, args []string, kind SearchType) {
 
 		// Get all icon images
 		if kind.Has(SearchIcons) {
+			// Add any requested filters
+			filters := []steamgriddb.FilterIcons{}
+			if style := cmd.Flags().Lookup("style-icon").Value.String(); style != "" {
+				filters = append(filters, steamgriddb.FilterIconsStyle(style))
+			}
+
+			// Get the icons
 			icons, err := client.GetIcons(appID)
 			if err != nil {
 				panic(err)
@@ -205,7 +244,6 @@ func search(cmd *cobra.Command, args []string, kind SearchType) {
 	}
 
 	// Print the output
-	format := rootCmd.PersistentFlags().Lookup("output").Value.String()
 	switch format {
 	case "term":
 		for _, result := range searchResult {
@@ -237,18 +275,18 @@ var searchCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Long:  `Search SteamGridDB for images. Returns all image types.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var searchFlags SearchType
-		if ok, _ := cmd.Flags().GetBool("grids"); ok {
-			searchFlags = searchFlags.Set(SearchGrids)
+		searchFlags := SearchGrids | SearchLogos | SearchIcons | SearchHeroes
+		if ok, _ := cmd.Flags().GetBool("only-grids"); ok {
+			searchFlags = SearchGrids
 		}
-		if ok, _ := cmd.Flags().GetBool("logos"); ok {
-			searchFlags = searchFlags.Set(SearchLogos)
+		if ok, _ := cmd.Flags().GetBool("only-logos"); ok {
+			searchFlags = SearchLogos
 		}
-		if ok, _ := cmd.Flags().GetBool("icons"); ok {
-			searchFlags = searchFlags.Set(SearchIcons)
+		if ok, _ := cmd.Flags().GetBool("only-icons"); ok {
+			searchFlags = SearchIcons
 		}
-		if ok, _ := cmd.Flags().GetBool("heroes"); ok {
-			searchFlags = searchFlags.Set(SearchHeroes)
+		if ok, _ := cmd.Flags().GetBool("only-heroes"); ok {
+			searchFlags = SearchHeroes
 		}
 		search(cmd, args, searchFlags)
 	},
@@ -265,10 +303,15 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	searchCmd.PersistentFlags().IntP("num-results", "n", 1, "Number of search results to return")
-	searchCmd.PersistentFlags().Int("num-images", 1, "Number of image results to return for a given image type")
-	searchCmd.PersistentFlags().Bool("grids", true, "Include grid images in search")
-	searchCmd.PersistentFlags().Bool("heroes", true, "Include hero images in search")
-	searchCmd.PersistentFlags().Bool("icons", true, "Include icon images in search")
-	searchCmd.PersistentFlags().Bool("logos", true, "Include logo images in search")
+	searchCmd.PersistentFlags().IntP("max-results", "n", 1, "Number of search results to return")
+	searchCmd.PersistentFlags().Int("max-images", 1, "Number of image results to return for a given image type")
+	searchCmd.PersistentFlags().Bool("only-heroes", false, "Only include hero images in search")
+	searchCmd.PersistentFlags().Bool("only-grids", false, "Only include grid images in search")
+	searchCmd.PersistentFlags().Bool("only-icons", false, "Only include icon images in search")
+	searchCmd.PersistentFlags().Bool("only-logos", false, "Only include logo images in search")
+	searchCmd.MarkFlagsMutuallyExclusive("only-grids", "only-heroes", "only-icons", "only-logos")
+	searchCmd.Flags().String("style-hero", "", `Optional hero style to search for ("alternate" "blurred" "material")`)
+	searchCmd.Flags().String("style-grid", "", `Optional grid style to search for ("alternate" "blurred" "white_logo" "material" "no_logo")`)
+	searchCmd.Flags().String("style-icon", "", `Optional icon style to search for ("official" "custom")`)
+	searchCmd.Flags().String("style-logo", "", `Optional logo style to search for ("official" "white" "black" "custom")`)
 }

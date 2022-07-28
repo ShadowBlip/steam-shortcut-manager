@@ -49,6 +49,7 @@ var listCmd = &cobra.Command{
 				fmt.Println("User:", user)
 				for _, sc := range shortcuts.Shortcuts {
 					fmt.Println("  ", sc.AppName)
+					fmt.Println("    AppId:", sc.Appid)
 					fmt.Println("    Executable:    ", sc.Exe)
 					fmt.Println("    Launch Options:", sc.LaunchOptions)
 				}

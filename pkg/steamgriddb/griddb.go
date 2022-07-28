@@ -114,7 +114,7 @@ func (c *Client) Search(term string) (*SearchResponse, error) {
 }
 
 // GetGrids will return the results of the grids for a given game ID
-func (c *Client) GetGrids(gameID string) (*GridResponse, error) {
+func (c *Client) GetGrids(gameID string, filters ...FilterGrid) (*GridResponse, error) {
 	res, err := c.Get("/grids/game/" + gameID)
 	if err != nil {
 		return nil, err
@@ -133,11 +133,17 @@ func (c *Client) GetGrids(gameID string) (*GridResponse, error) {
 		return nil, err
 	}
 
-	return &results, nil
+	// Filter our results
+	response := &results
+	for _, filter := range filters {
+		filter(response)
+	}
+
+	return response, nil
 }
 
 // GetHeroes will return the results of heroes for a given game ID
-func (c *Client) GetHeroes(gameID string) (*HeroesResponse, error) {
+func (c *Client) GetHeroes(gameID string, filters ...FilterHeroes) (*HeroesResponse, error) {
 	res, err := c.Get("/heroes/game/" + gameID)
 	if err != nil {
 		return nil, err
@@ -156,11 +162,17 @@ func (c *Client) GetHeroes(gameID string) (*HeroesResponse, error) {
 		return nil, err
 	}
 
-	return &results, nil
+	// Filter our results
+	response := &results
+	for _, filter := range filters {
+		filter(response)
+	}
+
+	return response, nil
 }
 
 // GetLogos will return the results of logos for a given game ID
-func (c *Client) GetLogos(gameID string) (*LogosResponse, error) {
+func (c *Client) GetLogos(gameID string, filters ...FilterLogos) (*LogosResponse, error) {
 	res, err := c.Get("/logos/game/" + gameID)
 	if err != nil {
 		return nil, err
@@ -177,13 +189,20 @@ func (c *Client) GetLogos(gameID string) (*LogosResponse, error) {
 	err = json.Unmarshal(body, &results)
 	if err != nil {
 		return nil, err
+
 	}
 
-	return &results, nil
+	// Filter our results
+	response := &results
+	for _, filter := range filters {
+		filter(response)
+	}
+
+	return response, nil
 }
 
 // GetIcons will return the results of icons for a given game ID
-func (c *Client) GetIcons(gameID string) (*IconsResponse, error) {
+func (c *Client) GetIcons(gameID string, filters ...FilterIcons) (*IconsResponse, error) {
 	res, err := c.Get("/icons/game/" + gameID)
 	if err != nil {
 		return nil, err
@@ -202,7 +221,13 @@ func (c *Client) GetIcons(gameID string) (*IconsResponse, error) {
 		return nil, err
 	}
 
-	return &results, nil
+	// Filter our results
+	response := &results
+	for _, filter := range filters {
+		filter(response)
+	}
+
+	return response, nil
 }
 
 func getUrl(path string) string {

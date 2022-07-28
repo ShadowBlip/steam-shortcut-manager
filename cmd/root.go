@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -40,6 +41,29 @@ var rootCmd = &cobra.Command{
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
+}
+
+// ExitError will print an error and exit depending on the output format
+func ExitError(err error, format string) {
+	switch format {
+	case "json":
+		out, _ := json.Marshal(map[string]string{"error": err.Error()})
+		fmt.Println(out)
+		os.Exit(1)
+	default:
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
 }
 
 func init() {
