@@ -17,9 +17,12 @@ package cmd
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
 
 	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
+	"github.com/shadowblip/steam-shortcut-manager/pkg/steamgriddb"
 	"github.com/spf13/cobra"
 )
 
@@ -30,13 +33,14 @@ var addCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Long:  `Adds a Steam shortcut to your library`,
 	Run: func(cmd *cobra.Command, args []string) {
+		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
 		name := args[0]
 		exe := args[1]
 
 		// Fetch all users
 		users, err := steam.GetUsers()
 		if err != nil {
-			panic(err)
+			ExitError(err, format)
 		}
 
 		// Check to see if we're fetching for just one user
@@ -54,7 +58,7 @@ var addCmd = &cobra.Command{
 			shortcutsPath, _ := steam.GetShortcutsPath(user)
 			shortcuts, err := shortcut.Load(shortcutsPath)
 			if err != nil {
-				panic(err)
+				ExitError(err, format)
 			}
 
 			// Generate a new shortcut from the cli flags
@@ -64,10 +68,96 @@ var addCmd = &cobra.Command{
 			// Write the changes
 			err = shortcut.Save(shortcuts, shortcutsPath)
 			if err != nil {
-				panic(err)
+				ExitError(err, format)
+			}
+
+			// Download images for the user if specified
+			if download, _ := cmd.Flags().GetBool("download-images"); download {
+				// Check that we have an API key
+				apiKey, _ := cmd.Flags().GetString("api-key")
+				if apiKey == "" {
+					ExitError(fmt.Errorf("no API key specified"), format)
+				}
+				client := steamgriddb.NewClient(apiKey)
+				err := downloadImages(client, user, newShortcut)
+				if err != nil {
+					ExitError(err, format)
+				}
 			}
 		}
 	},
+}
+
+// downloadImages will download images for the given shortcut
+// TODO: Handle errors better
+func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortcut) error {
+	// Get the image directory for the user.
+	gridDir, err := steam.GetImagesDir(user)
+	if err != nil {
+		return nil
+	}
+
+	// Search for the app images
+	results, err := client.Search(sc.AppName)
+	if err != nil {
+		return nil
+	}
+	// TODO: Log or return no image results
+	if len(results.Data) == 0 {
+		return nil
+	}
+
+	// Get the first result
+	// TODO: Enable showing different results?
+	gameID := fmt.Sprintf("%v", results.Data[0].ID)
+	steamAppID := fmt.Sprintf("%v", sc.Appid)
+
+	// Download the grid image. Grid image file names are [appId] + "p"
+	grids, err := client.GetGrids(gameID)
+	if err != nil {
+		return err
+	}
+	for _, data := range grids.Data {
+		ext := filepath.Ext(data.URL)
+		imgFile := path.Join(gridDir, fmt.Sprintf("%sp%s", steamAppID, ext))
+		err := client.CachedDownload(data.URL, imgFile)
+		if err != nil {
+			continue
+		}
+		break
+	}
+
+	// Download the hero image. Hero image file names are [appId] + "_hero"
+	heroes, err := client.GetHeroes(gameID)
+	if err != nil {
+		return err
+	}
+	for _, data := range heroes.Data {
+		ext := filepath.Ext(data.URL)
+		imgFile := path.Join(gridDir, fmt.Sprintf("%s_hero%s", steamAppID, ext))
+		err := client.CachedDownload(data.URL, imgFile)
+		if err != nil {
+			continue
+		}
+		break
+	}
+
+	// Download the hero image. Hero image file names are [appId] + "_hero"
+	logos, err := client.GetLogos(gameID)
+	if err != nil {
+		return err
+	}
+	for _, data := range logos.Data {
+		ext := filepath.Ext(data.URL)
+		imgFile := path.Join(gridDir, fmt.Sprintf("%s%s", steamAppID, ext))
+		err := client.CachedDownload(data.URL, imgFile)
+		if err != nil {
+			continue
+		}
+		break
+	}
+
+	return nil
 }
 
 // Creates a new shortcut object from command-line flags
@@ -125,6 +215,9 @@ func init() {
 	addCmd.Flags().String("icon", "", "Path to the icon to use for this application")
 	addCmd.Flags().StringSlice("tags", []string{}, "Comma-separated list of tags")
 	addCmd.Flags().String("user", "all", "Steam user ID to add the shortcut for")
+
+	addCmd.Flags().StringP("api-key", "k", "", "SteamGridDB API Key")
+	addCmd.Flags().BoolP("download-images", "i", false, "Auto-download artwork from SteamGridDB for shortcut (requires SteamGridDB API Key)")
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
