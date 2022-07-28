@@ -142,7 +142,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 		break
 	}
 
-	// Download the hero image. Hero image file names are [appId] + "_hero"
+	// Download the hero image. Logo image file names are [appId]
 	logos, err := client.GetLogos(gameID)
 	if err != nil {
 		return err
@@ -150,6 +150,21 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 	for _, data := range logos.Data {
 		ext := filepath.Ext(data.URL)
 		imgFile := path.Join(gridDir, fmt.Sprintf("%s%s", steamAppID, ext))
+		err := client.CachedDownload(data.URL, imgFile)
+		if err != nil {
+			continue
+		}
+		break
+	}
+
+	// Download the icon image. Hero image file names are [appId] + "-icon"
+	icons, err := client.GetIcons(gameID)
+	if err != nil {
+		return err
+	}
+	for _, data := range icons.Data {
+		ext := filepath.Ext(data.URL)
+		imgFile := path.Join(gridDir, fmt.Sprintf("%s-icon%s", steamAppID, ext))
 		err := client.CachedDownload(data.URL, imgFile)
 		if err != nil {
 			continue

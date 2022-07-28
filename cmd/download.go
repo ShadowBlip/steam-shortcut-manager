@@ -7,7 +7,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
+	"github.com/shadowblip/steam-shortcut-manager/pkg/steamgriddb"
 	"github.com/spf13/cobra"
 )
 
@@ -41,11 +43,13 @@ func discoverDownloadDir(cmd *cobra.Command, format string) string {
 
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
-	Use:   "download --api-key=<key>",
+	Use:   "download --api-key=<key> <name>",
 	Short: "Download SteamGridDB images for a given app",
 	Long:  `Download SteamGridDB images for a given app`,
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
+		name := args[0]
 
 		// Ensure we have a SteamGridDB API Key
 		apiKey, _ := cmd.Flags().GetString("api-key")
@@ -53,11 +57,31 @@ var downloadCmd = &cobra.Command{
 			cmd.Help()
 			ExitError(fmt.Errorf("API key is required"), format)
 		}
+		appId, _ := cmd.Flags().GetInt("app-id")
+		if appId == 0 {
+			cmd.Help()
+			ExitError(fmt.Errorf("Shortcut app id is required"), format)
+		}
 
-		// Get the directory to download to
-		downloadDir := discoverDownloadDir(cmd, format)
+		// Create a shortcut used to download the files
+		sc := &shortcut.Shortcut{Appid: int64(appId), AppName: name}
 
-		fmt.Println(downloadDir)
+		// Create a SteamGridDB client
+		client := steamgriddb.NewClient(apiKey)
+
+		// Get all steam users
+		users, err := steam.GetUsers()
+		if err != nil {
+			ExitError(err, format)
+		}
+
+		// TODO: Cache and symlink instead of downloading for each user
+		for _, user := range users {
+			err := downloadImages(client, user, sc)
+			if err != nil {
+				ExitError(err, format)
+			}
+		}
 	},
 }
 
@@ -68,9 +92,7 @@ func init() {
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	downloadCmd.PersistentFlags().StringP("destination-dir", "d", "", "Destination directory to download images")
-	downloadCmd.PersistentFlags().StringP("user", "u", "", "Steam user ID to download images for")
-	downloadCmd.MarkFlagsMutuallyExclusive("destination-dir", "user")
+	downloadCmd.Flags().Int("app-id", 0, "Steam App ID to download images for")
 
 	downloadCmd.PersistentFlags().Bool("only-hero", false, "Only download hero image")
 	downloadCmd.PersistentFlags().Bool("only-grid", false, "Only download grid image")
