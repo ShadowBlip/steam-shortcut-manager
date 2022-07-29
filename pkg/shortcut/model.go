@@ -80,6 +80,7 @@ func NewShortcut(name, exe string, settings ...ShortcutSetting) *Shortcut {
 	return shortcut
 }
 
+// Shortcut defines a single shortcut entry in the VDF file
 type Shortcut struct {
 	AllowDesktopConfig  int                    `json:"AllowDesktopConfig"`
 	AllowOverlay        int                    `json:"AllowOverlay"`

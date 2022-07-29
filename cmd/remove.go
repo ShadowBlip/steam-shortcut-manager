@@ -26,6 +26,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/shadowblip/steam-shortcut-manager/pkg/chimera"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
 	"github.com/spf13/cobra"
@@ -91,8 +92,48 @@ var removeCmd = &cobra.Command{
 	},
 }
 
+// removeCmd represents the remove command
+var chimeraRemoveCmd = &cobra.Command{
+	Use:   "remove <name>",
+	Short: "Remove a Chimera shortcut from your library",
+	Long:  `Remove a Chimera shortcut from your library`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		name := args[0]
+		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
+		if !chimera.HasChimera() {
+			ExitError(fmt.Errorf("no chimera config found at %v", chimera.ConfigDir), format)
+		}
+
+		// Get the platform flag
+		platform := chimeraCmd.PersistentFlags().Lookup("platform").Value.String()
+
+		// Read from the given shortcuts file
+		shortcuts, err := chimera.LoadShortcuts(chimera.GetShortcutsFile(platform))
+		if err != nil {
+			ExitError(err, format)
+		}
+
+		// Find the shortcut to remove by name
+		shortcutsList := []*chimera.Shortcut{}
+		for _, sc := range shortcuts {
+			if sc.Name == name {
+				continue
+			}
+			shortcutsList = append(shortcutsList, sc)
+		}
+
+		// Save the shortcuts
+		err = chimera.SaveShortcuts(chimera.GetShortcutsFile(platform), shortcutsList)
+		if err != nil {
+			ExitError(err, format)
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(removeCmd)
+	chimeraCmd.AddCommand(chimeraRemoveCmd)
 
 	// Here you will define your flags and configuration settings.
 	removeCmd.Flags().String("user", "all", "Steam user ID to remove the shortcut for")

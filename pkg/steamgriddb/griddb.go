@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 )
 
 const BASE_URL = "https://www.steamgriddb.com/api/v2"
@@ -65,6 +66,10 @@ func (c *Client) Download(url, path string) error {
 		return err
 	}
 	defer res.Body.Close()
+
+	// Make the parent directories if they don't exist
+	dir := filepath.Dir(path)
+	os.MkdirAll(dir, os.ModePerm)
 
 	// Create a empty file
 	file, err := os.Create(path)

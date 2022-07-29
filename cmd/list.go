@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/shadowblip/steam-shortcut-manager/pkg/chimera"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
 	"github.com/spf13/cobra"
@@ -38,9 +39,10 @@ var listCmd = &cobra.Command{
 	Short: "List currently registered Steam shortcuts",
 	Long:  `Lists all of the shortcuts registered in Steam`,
 	Run: func(cmd *cobra.Command, args []string) {
+		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
 		users, err := steam.GetUsers()
 		if err != nil {
-			panic(err)
+			ExitError(err, format)
 		}
 
 		// Fetch all shortcuts
@@ -52,13 +54,12 @@ var listCmd = &cobra.Command{
 			shortcutsPath, _ := steam.GetShortcutsPath(user)
 			shortcuts, err := shortcut.Load(shortcutsPath)
 			if err != nil {
-				panic(err)
+				ExitError(err, format)
 			}
 			results[user] = shortcuts
 		}
 
 		// Print the output
-		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
 		switch format {
 		case "term":
 			for user, shortcuts := range results {
@@ -76,7 +77,7 @@ var listCmd = &cobra.Command{
 		case "json":
 			out, err := json.MarshalIndent(results, "", "  ")
 			if err != nil {
-				panic(err)
+				ExitError(err, format)
 			}
 			fmt.Println(string(out))
 		default:
@@ -85,8 +86,49 @@ var listCmd = &cobra.Command{
 	},
 }
 
+// chimeraListCmd represents the list command
+var chimeraListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List currently registered Chimera shortcuts",
+	Long:  `Lists all of the shortcuts registered in Chimera`,
+	Run: func(cmd *cobra.Command, args []string) {
+		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
+		if !chimera.HasChimera() {
+			ExitError(fmt.Errorf("no chimera config found at %v", chimera.ConfigDir), format)
+		}
+
+		// Get the platform flag
+		platform := chimeraCmd.PersistentFlags().Lookup("platform").Value.String()
+
+		// Read from the given shortcuts file
+		shortcuts, err := chimera.LoadShortcuts(chimera.GetShortcutsFile(platform))
+		if err != nil {
+			ExitError(err, format)
+		}
+
+		// Print the output
+		switch format {
+		case "term":
+			for _, sc := range shortcuts {
+				fmt.Println(sc.Name)
+				fmt.Println("  Executable:", sc.Cmd)
+			}
+		case "json":
+			out, err := json.MarshalIndent(shortcuts, "", "  ")
+			if err != nil {
+				ExitError(err, format)
+			}
+			fmt.Println(string(out))
+		default:
+			panic("unknown output format: " + format)
+		}
+
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(listCmd)
+	chimeraCmd.AddCommand(chimeraListCmd)
 
 	// Here you will define your flags and configuration settings.
 
