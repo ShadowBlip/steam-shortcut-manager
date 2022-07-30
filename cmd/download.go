@@ -96,7 +96,7 @@ var downloadCmd = &cobra.Command{
 
 		// TODO: Cache and symlink instead of downloading for each user
 		for _, user := range users {
-			err := downloadImages(client, user, sc)
+			_, err := downloadImages(client, user, sc)
 			if err != nil {
 				ExitError(err, format)
 			}
