@@ -56,11 +56,18 @@ func ExitError(err error, format string) {
 	switch format {
 	case "json":
 		out, _ := json.Marshal(map[string]string{"error": err.Error()})
-		fmt.Println(out)
+		fmt.Println(string(out))
 		os.Exit(1)
 	default:
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
+	}
+}
+
+// Print debug messages if debug is enabled
+func DebugPrintln(s ...interface{}) {
+	if os.Getenv("DEBUG") != "" {
+		fmt.Println(s...)
 	}
 }
 

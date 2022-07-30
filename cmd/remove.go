@@ -101,6 +101,7 @@ var chimeraRemoveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
+		DebugPrintln("Using output format:", format)
 		if !chimera.HasChimera() {
 			ExitError(fmt.Errorf("no chimera config found at %v", chimera.ConfigDir), format)
 		}

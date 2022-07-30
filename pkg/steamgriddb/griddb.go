@@ -141,7 +141,7 @@ func (c *Client) GetGrids(gameID string, filters ...FilterGrid) (*GridResponse, 
 	// Filter our results
 	response := &results
 	for _, filter := range filters {
-		filter(response)
+		response.Data = filter(response)
 	}
 
 	return response, nil
@@ -170,7 +170,7 @@ func (c *Client) GetHeroes(gameID string, filters ...FilterHeroes) (*HeroesRespo
 	// Filter our results
 	response := &results
 	for _, filter := range filters {
-		filter(response)
+		response.Data = filter(response)
 	}
 
 	return response, nil
@@ -200,7 +200,7 @@ func (c *Client) GetLogos(gameID string, filters ...FilterLogos) (*LogosResponse
 	// Filter our results
 	response := &results
 	for _, filter := range filters {
-		filter(response)
+		response.Data = filter(response)
 	}
 
 	return response, nil
@@ -229,7 +229,7 @@ func (c *Client) GetIcons(gameID string, filters ...FilterIcons) (*IconsResponse
 	// Filter our results
 	response := &results
 	for _, filter := range filters {
-		filter(response)
+		response.Data = filter(response)
 	}
 
 	return response, nil
