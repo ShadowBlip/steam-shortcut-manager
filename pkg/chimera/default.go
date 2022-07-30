@@ -30,9 +30,6 @@ func HasChimera() bool {
 // GetShortcutsFile will return the path to the shortcuts file for the given
 // platform (e.g. flathub)
 func GetShortcutsFile(platform string) string {
-	if platform == "flathub" {
-		platform = "flatpak"
-	}
 	return path.Join(ShortcutsDir, fmt.Sprintf("chimera.%s.yaml", platform))
 }
 
