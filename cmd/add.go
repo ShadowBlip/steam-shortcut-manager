@@ -271,6 +271,12 @@ var chimeraAddCmd = &cobra.Command{
 		platform := chimeraCmd.PersistentFlags().Lookup("platform").Value.String()
 		DebugPrintln("Using Chimera platform:", platform)
 
+		// Ensure the Chimera shortcuts file exists
+		err := chimera.EnsureShortcutsFileExists(platform)
+		if err != nil {
+			ExitError(err, format)
+		}
+
 		// Check that we have required params for platform
 		switch platform {
 		case "flathub":

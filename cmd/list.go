@@ -100,6 +100,12 @@ var chimeraListCmd = &cobra.Command{
 		// Get the platform flag
 		platform := chimeraCmd.PersistentFlags().Lookup("platform").Value.String()
 
+		// Ensure the Chimera shortcuts file exists
+		err := chimera.EnsureShortcutsFileExists(platform)
+		if err != nil {
+			ExitError(err, format)
+		}
+
 		// Read from the given shortcuts file
 		shortcuts, err := chimera.LoadShortcuts(chimera.GetShortcutsFile(platform))
 		if err != nil {
