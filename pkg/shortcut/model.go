@@ -49,6 +49,26 @@ func (s *Shortcuts) Add(shortcut *Shortcut) error {
 	return nil
 }
 
+// LookupByName will return a shortcut by name
+func (s *Shortcuts) LookupByName(name string) (*Shortcut, error) {
+	for _, sc := range s.Shortcuts {
+		if sc.AppName == name {
+			return &sc, nil
+		}
+	}
+	return nil, fmt.Errorf("no shortcut found with name: %v", name)
+}
+
+// LookupByID will return a shortcut by name
+func (s *Shortcuts) LookupByID(appId int64) (*Shortcut, error) {
+	for _, sc := range s.Shortcuts {
+		if sc.Appid == appId {
+			return &sc, nil
+		}
+	}
+	return nil, fmt.Errorf("no shortcut found with id: %v", appId)
+}
+
 // Get the next shortcut id
 func (s *Shortcuts) getNextKey() (string, error) {
 	highestKey := -1

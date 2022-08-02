@@ -31,6 +31,7 @@ import (
 
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/chimera"
+	"github.com/shadowblip/steam-shortcut-manager/pkg/image/kitty"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steamgriddb"
@@ -71,10 +72,8 @@ var downloadCmd = &cobra.Command{
 	Use:   "download --api-key=<key> <name>",
 	Short: "Download SteamGridDB images for a given app",
 	Long:  `Download SteamGridDB images for a given app`,
-	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
-		name := args[0]
 
 		// Ensure we have a SteamGridDB API Key
 		apiKey, _ := cmd.Flags().GetString("api-key")
@@ -82,14 +81,6 @@ var downloadCmd = &cobra.Command{
 			cmd.Help()
 			ExitError(fmt.Errorf("API key is required"), format)
 		}
-		appId, _ := cmd.Flags().GetInt("app-id")
-		if appId == 0 {
-			cmd.Help()
-			ExitError(fmt.Errorf("Shortcut app id is required"), format)
-		}
-
-		// Create a shortcut used to download the files
-		sc := &shortcut.Shortcut{Appid: int64(appId), AppName: name}
 
 		// Create a SteamGridDB client
 		client := steamgriddb.NewClient(apiKey)
@@ -100,31 +91,90 @@ var downloadCmd = &cobra.Command{
 			ExitError(err, format)
 		}
 
-		// TODO: Cache and symlink instead of downloading for each user
-		results := map[string]interface{}{}
+		// Download for all users
 		var errors error
+		var results = map[string]map[string]map[string]string{}
 		for _, user := range users {
-			// Check that we have an API key
-			apiKey, _ := cmd.Flags().GetString("api-key")
-			if apiKey == "" {
-				ExitError(fmt.Errorf("no API key specified"), format)
+			// Build a list of shortcuts we're going to download images for
+			toDownload := []*shortcut.Shortcut{}
+
+			// Load the user's shotcuts
+			if !steam.HasShortcuts(user) {
+				continue
 			}
-			DebugPrintln("Downloading images for shortcut")
-			downloaded, err := downloadImages(client, user, sc)
+			shortcutsPath, _ := steam.GetShortcutsPath(user)
+			shortcuts, err := shortcut.Load(shortcutsPath)
 			if err != nil {
-				DebugPrintln("Error downloading images:", err)
 				errors = multierror.Append(errors, err)
+				continue
 			}
-			results[user] = downloaded
+			appId, _ := cmd.Flags().GetInt("app-id")
+
+			// If a shortcut name was specified, use that.
+			// NOTE: This is awful. Please forgive me
+			if len(args) > 0 {
+				name := args[0]
+				if appId != 0 {
+					// Create a shortcut used to download the files
+					sc := &shortcut.Shortcut{Appid: int64(appId), AppName: name}
+					toDownload = append(toDownload, sc)
+				} else {
+					sc, err := shortcuts.LookupByName(name)
+					if err != nil {
+						errors = multierror.Append(errors, err)
+						continue
+					}
+					toDownload = append(toDownload, sc)
+				}
+			} else {
+				if appId != 0 {
+					sc, err := shortcuts.LookupByID(int64(appId))
+					if err != nil {
+						errors = multierror.Append(errors, err)
+						continue
+					}
+					toDownload = append(toDownload, sc)
+				} else {
+					// Otherwise download for all shortcuts
+					for _, sc := range shortcuts.Shortcuts {
+						toDownload = append(toDownload, &sc)
+					}
+				}
+			}
+
+			// TODO: Cache and symlink instead of downloading for each user
+			results[user] = map[string]map[string]string{}
+			for _, sc := range toDownload {
+				// Check that we have an API key
+				apiKey, _ := cmd.Flags().GetString("api-key")
+				if apiKey == "" {
+					ExitError(fmt.Errorf("no API key specified"), format)
+				}
+				downloaded, err := downloadImages(client, user, sc)
+				if err != nil {
+					DebugPrintln("Error downloading images:", err)
+					errors = multierror.Append(errors, err)
+				}
+				results[user][fmt.Sprintf("%v", sc.Appid)] = downloaded
+			}
 		}
 		if errors != nil {
-			ExitError(err, format)
+			ExitError(errors, format)
 		}
 
 		// Print the output
 		switch format {
 		case "term":
-			fmt.Println(results)
+			for user, apps := range results {
+				fmt.Println("User:", user)
+				for appId, downloads := range apps {
+					fmt.Println("  Shortcut ID:", appId)
+					for kind, path := range downloads {
+						fmt.Printf("    %v: %v\n", kind, path)
+						kitty.Display(path)
+					}
+				}
+			}
 		case "json":
 			out, err := json.MarshalIndent(results, "", "  ")
 			if err != nil {
@@ -141,6 +191,7 @@ var downloadCmd = &cobra.Command{
 // downloadImages will download images for the given shortcut
 // TODO: Handle errors better
 func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortcut) (map[string]string, error) {
+	DebugPrintln("Downloading images for:", sc.AppName)
 	// This map will contain the paths to our downloaded images
 	downloaded := map[string]string{}
 	var errors error
@@ -374,11 +425,6 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	downloadCmd.Flags().IntP("app-id", "i", 0, "Steam App ID to download images for")
-
-	downloadCmd.PersistentFlags().Bool("only-hero", false, "Only download hero image")
-	downloadCmd.PersistentFlags().Bool("only-grid", false, "Only download grid image")
-	downloadCmd.PersistentFlags().Bool("only-icon", false, "Only download icon image")
-	downloadCmd.PersistentFlags().Bool("only-logo", false, "Only download logo image")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
