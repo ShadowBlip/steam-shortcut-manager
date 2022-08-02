@@ -29,6 +29,7 @@ import (
 	"path"
 	"path/filepath"
 
+	multierror "github.com/hashicorp/go-multierror"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/chimera"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
@@ -47,6 +48,7 @@ var addCmd = &cobra.Command{
 		format := rootCmd.PersistentFlags().Lookup("output").Value.String()
 		name := args[0]
 		exe := args[1]
+		var errors error
 
 		// Fetch all users
 		users, err := steam.GetUsers()
@@ -81,23 +83,26 @@ var addCmd = &cobra.Command{
 				if apiKey == "" {
 					ExitError(fmt.Errorf("no API key specified"), format)
 				}
+				DebugPrintln("Downloading images for shortcut")
 				client := steamgriddb.NewClient(apiKey)
 				downloaded, err := downloadImages(client, user, newShortcut)
 				if err != nil {
 					DebugPrintln("Error downloading images:", err)
-					//ExitError(err, format)
+					errors = multierror.Append(errors, err)
 				}
 
 				// Update our shortcut with image paths if needed
 				for imgType, path := range downloaded {
 					switch imgType {
 					case "icon":
+						DebugPrintln("Updating shortcut path")
 						newShortcut.Icon = path
 					}
 				}
 			}
 
 			// Write the changes
+			DebugPrintln("Adding shortcut")
 			shortcuts.Add(newShortcut)
 			err = shortcut.Save(shortcuts, shortcutsPath)
 			if err != nil {
@@ -112,6 +117,7 @@ var addCmd = &cobra.Command{
 func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortcut) (map[string]string, error) {
 	// This map will contain the paths to our downloaded images
 	downloaded := map[string]string{}
+	var errors error
 
 	// Get the image directory for the user.
 	gridDir, err := steam.GetImagesDir(user)
@@ -126,7 +132,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 	}
 	// TODO: Log or return no image results
 	if len(results.Data) == 0 {
-		return nil, err
+		return nil, fmt.Errorf("no results found for %v", sc.AppName)
 	}
 
 	// Get the first result
@@ -138,7 +144,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 	// that is displays in the library.
 	grids, err := client.GetGrids(gameID)
 	if err != nil {
-		//return nil, err
+		errors = multierror.Append(errors, err)
 		grids = &steamgriddb.GridResponse{Data: []steamgriddb.GridResponseData{}}
 	}
 	portraitGrids := steamgriddb.FilterGridVertical()(grids)
@@ -147,6 +153,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 		imgFile := path.Join(gridDir, fmt.Sprintf("%sp%s", steamAppID, ext))
 		err := client.CachedDownload(data.URL, imgFile)
 		if err != nil {
+			errors = multierror.Append(errors, err)
 			continue
 		}
 		downloaded["gridP"] = imgFile
@@ -158,6 +165,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 		imgFile := path.Join(gridDir, fmt.Sprintf("%s%s", steamAppID, ext))
 		err := client.CachedDownload(data.URL, imgFile)
 		if err != nil {
+			errors = multierror.Append(errors, err)
 			continue
 		}
 		downloaded["gridL"] = imgFile
@@ -168,7 +176,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 	// top of the app page in the Steam UI.
 	heroes, err := client.GetHeroes(gameID)
 	if err != nil {
-		//return nil, err
+		errors = multierror.Append(errors, err)
 		heroes = &steamgriddb.HeroesResponse{Data: []steamgriddb.ImageResponseData{}}
 	}
 	for _, data := range heroes.Data {
@@ -176,6 +184,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 		imgFile := path.Join(gridDir, fmt.Sprintf("%s_hero%s", steamAppID, ext))
 		err := client.CachedDownload(data.URL, imgFile)
 		if err != nil {
+			errors = multierror.Append(errors, err)
 			continue
 		}
 		downloaded["hero"] = imgFile
@@ -185,7 +194,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 	// Download the logo image. Logo images are used in the Steam overlay menu.
 	logos, err := client.GetLogos(gameID)
 	if err != nil {
-		//return nil, err
+		errors = multierror.Append(errors, err)
 		logos = &steamgriddb.LogosResponse{Data: []steamgriddb.ImageResponseData{}}
 	}
 	for _, data := range logos.Data {
@@ -193,6 +202,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 		imgFile := path.Join(gridDir, fmt.Sprintf("%s_logo%s", steamAppID, ext))
 		err := client.CachedDownload(data.URL, imgFile)
 		if err != nil {
+			errors = multierror.Append(errors, err)
 			continue
 		}
 		downloaded["logo"] = imgFile
@@ -202,7 +212,7 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 	// Download the icon image. Icon images are used in some part of the UI.
 	icons, err := client.GetIcons(gameID)
 	if err != nil {
-		//return nil, err
+		errors = multierror.Append(errors, err)
 		icons = &steamgriddb.IconsResponse{Data: []steamgriddb.ImageResponseData{}}
 	}
 	for _, data := range icons.Data {
@@ -210,13 +220,14 @@ func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortc
 		imgFile := path.Join(gridDir, fmt.Sprintf("%s-icon%s", steamAppID, ext))
 		err := client.CachedDownload(data.URL, imgFile)
 		if err != nil {
+			errors = multierror.Append(errors, err)
 			continue
 		}
 		downloaded["icon"] = imgFile
 		break
 	}
 
-	return downloaded, nil
+	return downloaded, errors
 }
 
 // Creates a new shortcut object from command-line flags

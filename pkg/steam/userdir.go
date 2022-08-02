@@ -50,16 +50,6 @@ func GetUsers() ([]string, error) {
 	return users, nil
 }
 
-// GetImagesDir will return the steam images directory
-func GetImagesDir(user string) (string, error) {
-	userDir, err := GetUserDir()
-	if err != nil {
-		return "", err
-	}
-
-	return path.Join(userDir, user, "config", "grid"), nil
-}
-
 // GetShortcutsPath will return the path to the shortcuts file for the given
 // user.
 func GetShortcutsPath(user string) (string, error) {

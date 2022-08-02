@@ -28,6 +28,7 @@ import (
 	"fmt"
 
 	"github.com/shadowblip/steam-shortcut-manager/pkg/chimera"
+	"github.com/shadowblip/steam-shortcut-manager/pkg/image/kitty"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/shortcut"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
 	"github.com/spf13/cobra"
@@ -56,7 +57,34 @@ var listCmd = &cobra.Command{
 			if err != nil {
 				ExitError(err, format)
 			}
-			results[user] = shortcuts
+
+			// Optionally Filter by app id
+			if appId, _ := cmd.Flags().GetString("app-id"); appId != "all" {
+				newShortcuts := shortcut.NewShortcuts()
+				for _, sc := range shortcuts.Shortcuts {
+					idStr := fmt.Sprintf("%v", sc.Appid)
+					if idStr != appId {
+						continue
+					}
+					newShortcuts.Add(&sc)
+				}
+				shortcuts = newShortcuts
+			}
+
+			// Discover the image paths for the shortcut
+			newShortcuts := shortcut.NewShortcuts()
+			for _, sc := range shortcuts.Shortcuts {
+				idStr := fmt.Sprintf("%v", sc.Appid)
+				images := &shortcut.Images{}
+				images.Logo, _ = steam.GetImageLogo(user, idStr)
+				images.Portrait, _ = steam.GetImagePortrait(user, idStr)
+				images.Landscape, _ = steam.GetImageLandscape(user, idStr)
+				images.Hero, _ = steam.GetImageHero(user, idStr)
+				sc.Images = images
+				newShortcuts.Add(&sc)
+			}
+
+			results[user] = newShortcuts
 		}
 
 		// Print the output
@@ -69,9 +97,29 @@ var listCmd = &cobra.Command{
 				fmt.Println("User:", user)
 				for _, sc := range shortcuts.Shortcuts {
 					fmt.Println("  ", sc.AppName)
-					fmt.Println("    AppId:", sc.Appid)
+					fmt.Println("    AppId:         ", sc.Appid)
 					fmt.Println("    Executable:    ", sc.Exe)
 					fmt.Println("    Launch Options:", sc.LaunchOptions)
+					fmt.Println("    Logo Image:    ", sc.Images.Logo)
+					if sc.Images.Logo != "" {
+						kitty.Display(sc.Images.Logo)
+					}
+					fmt.Println("    Portrait Image:", sc.Images.Portrait)
+					if sc.Images.Portrait != "" {
+						kitty.Display(sc.Images.Portrait)
+					}
+					fmt.Println("    Landscape Image:", sc.Images.Landscape)
+					if sc.Images.Landscape != "" {
+						kitty.Display(sc.Images.Landscape)
+					}
+					fmt.Println("    Hero Image:     ", sc.Images.Hero)
+					if sc.Images.Hero != "" {
+						kitty.Display(sc.Images.Hero)
+					}
+					fmt.Println("    Icon Image:     ", sc.Icon)
+					if sc.Icon != "" {
+						kitty.Display(sc.Icon)
+					}
 				}
 			}
 		case "json":
@@ -145,4 +193,5 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	listCmd.Flags().StringP("app-id", "i", "all", "Only list the given Steam app ID")
 }

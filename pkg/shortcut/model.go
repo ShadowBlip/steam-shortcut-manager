@@ -30,6 +30,10 @@ import (
 }
 */
 
+func NewShortcuts() *Shortcuts {
+	return &Shortcuts{Shortcuts: map[string]Shortcut{}}
+}
+
 type Shortcuts struct {
 	Shortcuts map[string]Shortcut `json:"shortcuts"`
 }
@@ -99,4 +103,14 @@ type Shortcut struct {
 	Appid               int64                  `json:"appid"`
 	Icon                string                 `json:"icon"`
 	Tags                map[string]interface{} `json:"tags"`
+	Images              *Images                `json:"images,omitempty"`
+}
+
+// Images is a structure that holds the paths to grid images for a shortcut.
+type Images struct {
+	Portrait  string `json:"portrait"`
+	Landscape string `json:"landscape"`
+	Hero      string `json:"hero"`
+	Logo      string `json:"logo"`
+	Icon      string `json:"icon"`
 }
