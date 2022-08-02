@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"github.com/shadowblip/steam-shortcut-manager/pkg/logger"
 )
 
 const BASE_URL = "https://www.steamgriddb.com/api/v2"
@@ -38,21 +40,26 @@ func (c *Client) debug(str string) {
 
 // Get will perform a GET request to the given SteamGridDB API endpoint.
 func (c *Client) Get(path string) (*http.Response, error) {
-	return c.get(getUrl(path))
+	return c.get(getUrl(path), true)
 }
 
-func (c *Client) get(url string) (*http.Response, error) {
+func (c *Client) get(url string, authenticated bool) (*http.Response, error) {
 	c.debug("GET " + url)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	if authenticated {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if res.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(res.Body)
+		logger.DebugPrintln(res.StatusCode)
+		logger.DebugPrintln(string(body))
 		return nil, fmt.Errorf("Received non 200 response code")
 	}
 	return res, nil
@@ -61,7 +68,7 @@ func (c *Client) get(url string) (*http.Response, error) {
 // Download will download the given file to the provided path
 func (c *Client) Download(url, path string) error {
 	// Fetch the file
-	res, err := c.get(url)
+	res, err := c.get(url, false)
 	if err != nil {
 		return err
 	}

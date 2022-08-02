@@ -26,6 +26,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/shadowblip/steam-shortcut-manager/pkg/chimera"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/image/kitty"
@@ -103,22 +104,27 @@ var listCmd = &cobra.Command{
 					fmt.Println("    Logo Image:    ", sc.Images.Logo)
 					if sc.Images.Logo != "" {
 						kitty.Display(sc.Images.Logo)
+						time.Sleep(1 * time.Second)
 					}
 					fmt.Println("    Portrait Image:", sc.Images.Portrait)
 					if sc.Images.Portrait != "" {
 						kitty.Display(sc.Images.Portrait)
+						time.Sleep(1 * time.Second)
 					}
 					fmt.Println("    Landscape Image:", sc.Images.Landscape)
 					if sc.Images.Landscape != "" {
 						kitty.Display(sc.Images.Landscape)
+						time.Sleep(1 * time.Second)
 					}
 					fmt.Println("    Hero Image:     ", sc.Images.Hero)
 					if sc.Images.Hero != "" {
 						kitty.Display(sc.Images.Hero)
+						time.Sleep(1 * time.Second)
 					}
 					fmt.Println("    Icon Image:     ", sc.Icon)
 					if sc.Icon != "" {
 						kitty.Display(sc.Icon)
+						time.Sleep(1 * time.Second)
 					}
 				}
 			}

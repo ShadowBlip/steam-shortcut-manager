@@ -26,8 +26,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"path"
-	"path/filepath"
 
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/chimera"
@@ -35,7 +33,6 @@ import (
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steam"
 	"github.com/shadowblip/steam-shortcut-manager/pkg/steamgriddb"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // addCmd represents the add command
@@ -110,124 +107,6 @@ var addCmd = &cobra.Command{
 			}
 		}
 	},
-}
-
-// downloadImages will download images for the given shortcut
-// TODO: Handle errors better
-func downloadImages(client *steamgriddb.Client, user string, sc *shortcut.Shortcut) (map[string]string, error) {
-	// This map will contain the paths to our downloaded images
-	downloaded := map[string]string{}
-	var errors error
-
-	// Get the image directory for the user.
-	gridDir, err := steam.GetImagesDir(user)
-	if err != nil {
-		return nil, err
-	}
-
-	// Search for the app images
-	results, err := client.Search(sc.AppName)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: Log or return no image results
-	if len(results.Data) == 0 {
-		return nil, fmt.Errorf("no results found for %v", sc.AppName)
-	}
-
-	// Get the first result
-	// TODO: Enable showing different results?
-	gameID := fmt.Sprintf("%v", results.Data[0].ID)
-	steamAppID := fmt.Sprintf("%v", sc.Appid)
-
-	// Download the grid images. Steam uses a portrait and landscape image
-	// that is displays in the library.
-	grids, err := client.GetGrids(gameID)
-	if err != nil {
-		errors = multierror.Append(errors, err)
-		grids = &steamgriddb.GridResponse{Data: []steamgriddb.GridResponseData{}}
-	}
-	portraitGrids := steamgriddb.FilterGridVertical()(grids)
-	for _, data := range portraitGrids {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(gridDir, fmt.Sprintf("%sp%s", steamAppID, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			errors = multierror.Append(errors, err)
-			continue
-		}
-		downloaded["gridP"] = imgFile
-		break
-	}
-	landscapeGrids := steamgriddb.FilterGridHorizontal()(grids)
-	for _, data := range landscapeGrids {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(gridDir, fmt.Sprintf("%s%s", steamAppID, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			errors = multierror.Append(errors, err)
-			continue
-		}
-		downloaded["gridL"] = imgFile
-		break
-	}
-
-	// Download the hero image. The hero image is used as a banner at the
-	// top of the app page in the Steam UI.
-	heroes, err := client.GetHeroes(gameID)
-	if err != nil {
-		errors = multierror.Append(errors, err)
-		heroes = &steamgriddb.HeroesResponse{Data: []steamgriddb.ImageResponseData{}}
-	}
-	for _, data := range heroes.Data {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(gridDir, fmt.Sprintf("%s_hero%s", steamAppID, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			errors = multierror.Append(errors, err)
-			continue
-		}
-		downloaded["hero"] = imgFile
-		break
-	}
-
-	// Download the logo image. Logo images are used in the Steam overlay menu.
-	logos, err := client.GetLogos(gameID)
-	if err != nil {
-		errors = multierror.Append(errors, err)
-		logos = &steamgriddb.LogosResponse{Data: []steamgriddb.ImageResponseData{}}
-	}
-	for _, data := range logos.Data {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(gridDir, fmt.Sprintf("%s_logo%s", steamAppID, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			errors = multierror.Append(errors, err)
-			continue
-		}
-		downloaded["logo"] = imgFile
-		break
-	}
-
-	// Download the icon image. Icon images are used in some part of the UI.
-	icons, err := client.GetIcons(gameID)
-	if err != nil {
-		errors = multierror.Append(errors, err)
-		icons = &steamgriddb.IconsResponse{Data: []steamgriddb.ImageResponseData{}}
-	}
-	for _, data := range icons.Data {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(gridDir, fmt.Sprintf("%s-icon%s", steamAppID, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			errors = multierror.Append(errors, err)
-			continue
-		}
-		downloaded["icon"] = imgFile
-		break
-	}
-
-	return downloaded, errors
 }
 
 // Creates a new shortcut object from command-line flags
@@ -364,110 +243,6 @@ var chimeraAddCmd = &cobra.Command{
 			panic("unknown output format: " + format)
 		}
 	},
-}
-
-// downloadChimeraImages will download images for the given shortcut. This
-// will return the paths of each type of image we downloaded.
-// TODO: Handle errors better
-func downloadChimeraImages(flags *pflag.FlagSet, client *steamgriddb.Client, platform string, sc *chimera.Shortcut) (map[string]string, error) {
-	// Get the download directories
-	posterDir := path.Join(chimera.PosterDir, platform)
-	bannerDir := path.Join(chimera.BannerDir, platform)
-	logoDir := path.Join(chimera.LogoDir, platform)
-	backgroundDir := path.Join(chimera.BackgroundDir, platform)
-
-	// This map will contain the paths to our downloaded images
-	downloaded := map[string]string{}
-
-	// Set the base file name based on platform
-	var fileBaseName string
-
-	// Shortcuts for different platforms are handled differently
-	switch platform {
-	case "flathub":
-		fileBaseName = flags.Lookup("flatpak-id").Value.String()
-	default:
-		fileBaseName = sc.Name
-	}
-
-	// Search for the app images
-	results, err := client.Search(sc.Name)
-	if err != nil {
-		return downloaded, nil
-	}
-	// TODO: Log or return no image results
-	if len(results.Data) == 0 {
-		return downloaded, nil
-	}
-
-	// Get the first result
-	// TODO: Enable showing different results?
-	gameID := fmt.Sprintf("%v", results.Data[0].ID)
-
-	// Download the grid image. Grid images are "poster" Chimera images
-	grids, err := client.GetGrids(gameID)
-	if err != nil {
-		return nil, err
-	}
-	posters := steamgriddb.FilterGridVertical()(grids)
-	for _, data := range posters {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(posterDir, fmt.Sprintf("%s%s", fileBaseName, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			continue
-		}
-		downloaded["poster"] = imgFile
-		break
-	}
-
-	// We also need to get the "banner" image which is a grid with
-	// a landscape orientation.
-	banners := steamgriddb.FilterGridHorizontal()(grids)
-	for _, data := range banners {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(bannerDir, fmt.Sprintf("%s%s", fileBaseName, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			continue
-		}
-		downloaded["banner"] = imgFile
-		break
-	}
-
-	// Download the hero image. Hero images are "background" Chimera images
-	heroes, err := client.GetHeroes(gameID)
-	if err != nil {
-		return nil, err
-	}
-	for _, data := range heroes.Data {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(backgroundDir, fmt.Sprintf("%s%s", fileBaseName, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			continue
-		}
-		downloaded["background"] = imgFile
-		break
-	}
-
-	// Download the logo image. Logo images are "logo" Chimera images
-	logos, err := client.GetLogos(gameID)
-	if err != nil {
-		return nil, err
-	}
-	for _, data := range logos.Data {
-		ext := filepath.Ext(data.URL)
-		imgFile := path.Join(logoDir, fmt.Sprintf("%s%s", fileBaseName, ext))
-		err := client.CachedDownload(data.URL, imgFile)
-		if err != nil {
-			continue
-		}
-		downloaded["logo"] = imgFile
-		break
-	}
-
-	return downloaded, nil
 }
 
 // Creates a new Chimera shortcut entry from command-line flags
